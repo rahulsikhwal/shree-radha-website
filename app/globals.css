@@ -2,14 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
-html { scroll-behavior: smooth; }
+html {
+  scroll-behavior: smooth;
+}
 
 body {
   margin: 0;
-  font-family: Arial, Helvetica, sans-serif;
-  background: #fffaf0;
 }
-
-* { box-sizing: border-box; }
-img { max-width: 100%; }
-input, textarea, select, button { font: inherit; }
