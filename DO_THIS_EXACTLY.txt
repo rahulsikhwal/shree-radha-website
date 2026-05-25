@@ -1,0 +1,39 @@
+This Vercel error will only stop after GitHub receives these exact path changes:
+
+1. app/page.tsx
+2. lib/products.js
+3. lib/products.ts
+4. next.config.js
+
+Do NOT upload this folder as a zip into GitHub.
+GitHub does not automatically extract zip files.
+
+Manual GitHub web steps:
+
+1. Open your GitHub repository.
+2. Open the app folder.
+3. Click page.tsx.
+4. Click the pencil/edit button.
+5. Delete all old code.
+6. Paste the code from FINAL_UPLOAD_THESE_EXACT_FILES/app/page.tsx.
+7. Commit changes.
+8. Go back to repository root.
+9. Open or create the lib folder.
+10. Upload or create products.js using FINAL_UPLOAD_THESE_EXACT_FILES/lib/products.js.
+11. Commit changes.
+12. Replace next.config.js with FINAL_UPLOAD_THESE_EXACT_FILES/next.config.js.
+13. Commit changes.
+
+Before deploying, check GitHub:
+
+- app/page.tsx must NOT contain "@/lib/products"
+- lib/products.js must exist
+- lib/products.ts must exist
+
+Then Vercel:
+
+1. Settings -> General -> Root Directory should be blank.
+2. Deployments -> Redeploy.
+3. Select clear build cache / redeploy without cache.
+
+If Vercel still says app/page.tsx imports "@/lib/products", then GitHub app/page.tsx was not replaced or Vercel is using a different branch/repository.

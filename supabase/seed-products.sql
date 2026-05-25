@@ -1,0 +1,18 @@
+-- Optional seed data. Run after schema.sql.
+
+insert into public.products (slug, name, category, description, detail, image_url, features, mrp, is_active, sort_order)
+values
+('flynfit-ortho-care','FlyNfit Ortho Care','Men''s Ortho','Ultra-light comfort slipper with a soft cushion footbed and anti-slip sole for everyday support.','FlyNfit Ortho Care is designed for people who need comfortable daily footwear without compromising on appearance. Its soft cushion footbed supports the sole during long hours of walking, while the anti-slip outsole improves grip on regular indoor and outdoor surfaces. A smart choice for retail buyers looking for a dependable comfort slipper range.','/product-flynfit.jpg',array['Ultra Light','Soft Cushion','Anti-Slip','Daily Comfort'],'',true,1),
+('ortho-rest-orthopedic','Ortho+Rest Orthopedic','Comfort','Supportive orthopedic flip-flops designed for daily comfort, relaxed walking and soft feel.','Ortho+Rest Orthopedic is made for users who prefer a relaxed and supportive walking experience. The cushioned base and soft strap feel make it suitable for everyday wear, home use, travel and casual movement. The product is ideal for dealers who want a practical orthopedic comfort collection.','/product-ortho-rest-blue-black.jpg',array['Supportive','Soft Footbed','Daily Wear','Relaxed Fit'],'',true,2),
+('ortho-rest-multi-color','Ortho+Rest Multi Color','Ladies Ortho','Stylish orthopedic slippers with multiple color strap options and a cushioned base.','This multi-color Ortho+Rest collection combines comfort with style. The attractive strap options help retailers display a fashionable orthopedic range for women, while the cushioned base supports daily usage. It is suitable for showrooms, footwear shops and bulk comfort footwear supply.','/product-ortho-rest-multi.jpg',array['Multi Color','Comfort Fit','Trendy','Ladies Range'],'',true,3),
+('famouss-high-heel','Famouss High Heel','Ladies Fashion','Fashionable high heel flip-flops with comfort styling, available in sizes 4 to 9.','Famouss High Heel is a fashionable ladies flip-flop range made for buyers who want style with everyday usability. The elevated heel profile, attractive design and comfortable base make it suitable for casual wear, showroom display and retail footwear counters.','/product-famouss-high-heel.jpg',array['High Heel','Fashion','Size 4-9','Retail Friendly'],'',true,4),
+('ladies-socket','Ladies Socket','Casual','Soft, durable and lightweight casual slipper designed for comfortable everyday wear.','Ladies Socket is a lightweight and soft casual slipper designed for everyday use. Its simple comfort-driven design makes it easy to sell in retail stores and suitable for regular domestic wear. A useful product for shops looking for dependable daily footwear options.','/product-ladies-socket.jpg',array['Lightweight','Durable','Flexible','Casual Wear'],'',true,5),
+('article-reshma','Article Reshma','Designer','Designer printed strap slippers with premium fabric finish and a stylish showroom look.','Article Reshma is a designer slipper range with premium printed straps and a stylish presentation. It is made for retailers who want attractive ladies footwear that stands out in display and appeals to fashion-conscious customers.','/product-article-reshma.jpg',array['Designer Strap','Premium Look','Fashion Wear','Showroom Style'],'',true,6)
+on conflict (slug) do update set
+name = excluded.name,
+category = excluded.category,
+description = excluded.description,
+detail = excluded.detail,
+image_url = excluded.image_url,
+features = excluded.features,
+sort_order = excluded.sort_order;
