@@ -241,6 +241,56 @@ export default function AdminDashboard() {
     showMsg("Image uploaded and selected. Save the product to keep this image.");
   }
 
+
+  async function uploadGalleryImages(files) {
+    if (!files?.length || !editingProduct) return;
+
+    const uploadedUrls = [];
+    for (const file of Array.from(files)) {
+      if (!SUPPORTED_IMAGE_TYPES.includes(file.type)) {
+        showMsg("Please upload only JPG, PNG or WEBP images.", "error");
+        return;
+      }
+      if (file.size > MAX_PRODUCT_IMAGE_SIZE) {
+        showMsg(`${file.name} is too large. Please upload images under 2 MB.`, "error");
+        return;
+      }
+
+      const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
+      const safeSlug = editingProduct.slug || slugify(editingProduct.name || "product");
+      const filePath = `${safeSlug}-gallery-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${extension}`;
+
+      const { error } = await supabase.storage
+        .from(PRODUCT_IMAGE_BUCKET)
+        .upload(filePath, file, {
+          cacheControl: "3600",
+          upsert: false,
+          contentType: file.type,
+        });
+
+      if (error) {
+        showMsg(`Gallery image upload failed: ${error.message}. Please confirm the product-images bucket exists in Supabase.`, "error");
+        return;
+      }
+
+      const { data } = supabase.storage.from(PRODUCT_IMAGE_BUCKET).getPublicUrl(filePath);
+      uploadedUrls.push(data.publicUrl);
+    }
+
+    setEditingProduct({
+      ...editingProduct,
+      gallery_images: [...(editingProduct.gallery_images || []), ...uploadedUrls],
+    });
+    showMsg(`${uploadedUrls.length} gallery image${uploadedUrls.length > 1 ? "s" : ""} uploaded. Save the product to keep changes.`);
+  }
+
+  function removeGalleryImage(indexToRemove) {
+    setEditingProduct({
+      ...editingProduct,
+      gallery_images: (editingProduct.gallery_images || []).filter((_, index) => index !== indexToRemove),
+    });
+  }
+
   async function signIn(e) {
     e.preventDefault();
     setMessage({ text: "", type: "success" });
@@ -628,19 +678,48 @@ export default function AdminDashboard() {
                 onChange={(value) => setEditingProduct({ ...editingProduct, features: value.split(/<br>|<div>|<\/div>|\n/).map(v => v.replace(/<[^>]*>/g, '').trim()).filter(Boolean) })}
               />
 
-              <label className="mt-4 block">
-                <span className="mb-1 block text-xs font-black uppercase tracking-wide text-slate-400">Multiple Product Images (comma separated URLs)</span>
-                <textarea
-                  value={(editingProduct.gallery_images || []).join(', ')}
-                  onChange={(e) => setEditingProduct({
-                    ...editingProduct,
-                    gallery_images: e.target.value.split(',').map(v => v.trim()).filter(Boolean)
-                  })}
-                  rows={3}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
-                  placeholder="/img1.jpg, /img2.jpg"
-                />
-              </label>
+              <div className="mt-4 rounded-3xl border border-slate-200 bg-slate-50 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <span className="mb-1 block text-xs font-black uppercase tracking-wide text-slate-400">Multiple Product Images</span>
+                    <p className="text-sm font-semibold text-slate-600">Upload extra product photos using the dialog box. They will appear in the product gallery.</p>
+                    <p className="mt-1 text-xs font-bold text-amber-700">Recommended size: 1200 x 1200 px square, under 2 MB each. Supported: JPG, PNG, WEBP.</p>
+                  </div>
+                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white hover:bg-amber-600 transition-colors">
+                    <UploadCloud size={17} /> Add Gallery Images
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/jpeg,image/png,image/webp"
+                      className="hidden"
+                      onChange={(e) => uploadGalleryImages(e.target.files)}
+                    />
+                  </label>
+                </div>
+
+                {(editingProduct.gallery_images || []).length > 0 ? (
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    {(editingProduct.gallery_images || []).map((imageUrl, index) => (
+                      <div key={`${imageUrl}-${index}`} className="rounded-2xl border border-slate-200 bg-white p-3">
+                        <div className="flex h-32 items-center justify-center rounded-xl bg-slate-50 p-2">
+                          <img src={getPublicAssetPath(imageUrl)} alt={`Gallery image ${index + 1}`} className="max-h-28 w-full object-contain" />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeGalleryImage(index)}
+                          className="mt-3 w-full rounded-xl bg-red-50 px-3 py-2 text-xs font-black text-red-600 hover:bg-red-100"
+                        >
+                          Remove Image
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-center text-sm font-bold text-slate-400">
+                    No gallery images added yet. Click “Add Gallery Images” to upload multiple images.
+                  </div>
+                )}
+              </div>
 
               <label className="mt-4 block">
                 <span className="mb-1 block text-xs font-black uppercase tracking-wide text-slate-400">Multiple Sections JSON</span>
@@ -672,6 +751,11 @@ export default function AdminDashboard() {
                 <button type="button" onClick={closeProductEditor} className="rounded-2xl border border-slate-200 px-6 py-3 font-bold text-slate-600 hover:bg-slate-50 transition-colors">
                   Cancel
                 </button>
+                {editingProduct.id && (
+                  <button type="button" onClick={() => deleteProduct(editingProduct.id)} className="inline-flex items-center gap-2 rounded-2xl bg-red-50 px-6 py-3 font-black text-red-600 hover:bg-red-100 transition-colors">
+                    <Trash2 size={17} /> Delete Product
+                  </button>
+                )}
               </div>
             </form>
           ) : (
