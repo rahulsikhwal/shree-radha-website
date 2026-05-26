@@ -1,0 +1,14 @@
+Final Vercel deployment fix:
+
+1. Delete package-lock.json from GitHub if it exists.
+2. Upload these extracted files to the repository root.
+3. In Vercel Settings:
+   - Root Directory: leave BLANK (do not type /)
+   - Framework Preset: Next.js
+   - Install Command: npm install --legacy-peer-deps --no-audit --no-fund
+   - Build Command: npm run build
+   - Output Directory: leave BLANK
+   - Node.js Version: 20.x
+4. Redeploy with cache disabled.
+
+The previous error was caused by npm install failing before Vercel could inspect the installed Next.js dependency.
