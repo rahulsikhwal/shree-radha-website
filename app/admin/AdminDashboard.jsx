@@ -50,6 +50,7 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState([]);
   const [inquiries, setInquiries] = useState([]);
   const [editingProduct, setEditingProduct] = useState(null);
+  const [originalProductImageUrl, setOriginalProductImageUrl] = useState("");
   const [editingStat, setEditingStat] = useState(null);
   const [message, setMessage] = useState({ text: "", type: "success" });
   const [loading, setLoading] = useState(true);
@@ -98,6 +99,81 @@ export default function AdminDashboard() {
   function getPublicAssetPath(value) {
     if (!value) return "";
     return value.startsWith("http") || value.startsWith("/") ? value : `/${value}`;
+  }
+
+  function getProductImageStoragePath(value) {
+    if (!value) return "";
+    const imageValue = String(value).trim();
+
+    if (!imageValue || imageValue.startsWith("data:") || imageValue.startsWith("blob:")) return "";
+
+    const bucketPrefix = `/${PRODUCT_IMAGE_BUCKET}/`;
+    const publicStorageMarker = `/storage/v1/object/public/${PRODUCT_IMAGE_BUCKET}/`;
+
+    if (imageValue.startsWith(publicStorageMarker)) {
+      return decodeURIComponent(imageValue.slice(publicStorageMarker.length).split("?")[0]);
+    }
+
+    if (imageValue.startsWith("http://") || imageValue.startsWith("https://")) {
+      try {
+        const url = new URL(imageValue);
+        const markerIndex = url.pathname.indexOf(publicStorageMarker);
+        if (markerIndex === -1) return "";
+        return decodeURIComponent(url.pathname.slice(markerIndex + publicStorageMarker.length));
+      } catch (_error) {
+        return "";
+      }
+    }
+
+    if (imageValue.startsWith(bucketPrefix)) {
+      return decodeURIComponent(imageValue.slice(bucketPrefix.length).split("?")[0]);
+    }
+
+    if (!imageValue.startsWith("/") && !imageValue.includes("://")) {
+      return decodeURIComponent(imageValue.split("?")[0]);
+    }
+
+    return "";
+  }
+
+  async function isProductImageUsedElsewhere(imageUrl, currentProductId) {
+    if (!imageUrl) return false;
+
+    const storagePath = getProductImageStoragePath(imageUrl);
+    const { data, error } = await supabase.from("products").select("id, image_url");
+    if (error) {
+      console.warn("Could not verify product image usage before cleanup:", error.message);
+      return true;
+    }
+
+    return Boolean((data || []).some((product) => {
+      if (currentProductId && product.id === currentProductId) return false;
+      if (product.image_url === imageUrl) return true;
+      return storagePath && getProductImageStoragePath(product.image_url) === storagePath;
+    }));
+  }
+
+  async function deleteProductImageFromStorageIfUnused(imageUrl, currentProductId) {
+    const storagePath = getProductImageStoragePath(imageUrl);
+    if (!storagePath) return;
+
+    const isUsedElsewhere = await isProductImageUsedElsewhere(imageUrl, currentProductId);
+    if (isUsedElsewhere) return;
+
+    const { error } = await supabase.storage.from(PRODUCT_IMAGE_BUCKET).remove([storagePath]);
+    if (error) {
+      console.warn("Old product image cleanup failed:", error.message);
+    }
+  }
+
+  function beginProductEdit(product) {
+    setOriginalProductImageUrl(product?.image_url || "");
+    setEditingProduct({ ...product });
+  }
+
+  function closeProductEditor() {
+    setOriginalProductImageUrl("");
+    setEditingProduct(null);
   }
 
   async function uploadProductImage(file) {
@@ -165,16 +241,25 @@ export default function AdminDashboard() {
       ? await supabase.from("products").update(product).eq("id", product.id)
       : await supabase.from("products").insert(product);
     if (error) { showMsg(error.message, "error"); return; }
-    setEditingProduct(null);
+
+    if (product.id && originalProductImageUrl && originalProductImageUrl !== product.image_url) {
+      await deleteProductImageFromStorageIfUnused(originalProductImageUrl, product.id);
+    }
+
+    closeProductEditor();
     showMsg("Product saved successfully.");
     loadAdminData();
   }
 
   async function deleteProduct(id) {
     if (!window.confirm("Delete this product permanently?")) return;
+    const productToDelete = products.find((product) => product.id === id);
     const { error } = await supabase.from("products").delete().eq("id", id);
+    if (!error) {
+      await deleteProductImageFromStorageIfUnused(productToDelete?.image_url, id);
+      closeProductEditor();
+    }
     showMsg(error ? error.message : "Product deleted.", error ? "error" : "success");
-    setEditingProduct(null);
     loadAdminData();
   }
 
@@ -403,7 +488,7 @@ export default function AdminDashboard() {
           <div className="rounded-3xl bg-white p-5 shadow-xl ring-1 ring-yellow-100">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-black">Products</h2>
-              <button onClick={() => setEditingProduct({ ...emptyProduct })} className="grid h-8 w-8 place-items-center rounded-xl bg-slate-950 text-white hover:bg-amber-600 transition-colors">
+              <button onClick={() => beginProductEdit({ ...emptyProduct })} className="grid h-8 w-8 place-items-center rounded-xl bg-slate-950 text-white hover:bg-amber-600 transition-colors">
                 <Plus size={17} />
               </button>
             </div>
@@ -411,7 +496,7 @@ export default function AdminDashboard() {
               {sortedProducts.map((p) => (
                 <button
                   key={p.id}
-                  onClick={() => setEditingProduct(p)}
+                  onClick={() => beginProductEdit(p)}
                   className={`w-full rounded-2xl px-4 py-3 text-left text-sm font-bold transition-colors ${editingProduct?.id === p.id ? "bg-amber-400 text-slate-950" : "bg-slate-50 text-slate-700 hover:bg-yellow-50"}`}
                 >
                   <span className="flex items-center justify-between gap-2">
@@ -519,7 +604,7 @@ export default function AdminDashboard() {
                 <button className="inline-flex items-center gap-2 rounded-2xl bg-amber-400 px-6 py-3 font-black text-slate-950 hover:bg-amber-500 transition-colors">
                   <Save size={17} /> {editingProduct.id ? "Save Product" : "Add Product"}
                 </button>
-                <button type="button" onClick={() => setEditingProduct(null)} className="rounded-2xl border border-slate-200 px-6 py-3 font-bold text-slate-600 hover:bg-slate-50 transition-colors">
+                <button type="button" onClick={closeProductEditor} className="rounded-2xl border border-slate-200 px-6 py-3 font-bold text-slate-600 hover:bg-slate-50 transition-colors">
                   Cancel
                 </button>
               </div>
