@@ -17,6 +17,8 @@ export async function generateMetadata({ params }) {
   };
 }
 
+function getTheme(settings) { return /^#[0-9A-F]{6}$/i.test(settings?.theme_color || "") ? settings.theme_color : "#f59e0b"; }
+
 export default async function ProductDetailPage({ params }) {
   const resolvedParams = await params;
   const settings = await getSettings();

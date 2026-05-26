@@ -13,6 +13,11 @@ import {
   ArrowRight,
 } from "lucide-react";
 
+const DEFAULT_THEME = "#f59e0b";
+function themeColor(settings) {
+  return /^#[0-9A-F]{6}$/i.test(settings?.theme_color || "") ? settings.theme_color : DEFAULT_THEME;
+}
+
 function WhatsAppIcon({ size = 26 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 32 32" fill="currentColor" aria-hidden="true">
@@ -28,15 +33,17 @@ export default async function Home() {
   const products = await getProducts();
   const stats = await getStats();
 
+  const mainTheme = themeColor(settings);
+
   return (
-    <main className="min-h-screen bg-[#fffaf0] text-slate-950">
+    <main className="min-h-screen bg-[#fffaf0] text-slate-950" style={{ "--site-theme": mainTheme }}>
       <Header settings={settings} />
 
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(250,204,21,0.35),_transparent_35%),radial-gradient(circle_at_bottom_right,_rgba(180,83,9,0.22),_transparent_35%)]" />
         <div className="relative mx-auto grid min-h-[88vh] max-w-7xl items-center gap-12 px-5 py-16 md:grid-cols-2 md:py-24">
           <div>
-            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-yellow-300 bg-white px-4 py-2 text-sm font-bold text-amber-800 shadow-sm">
+            <div className="mb-6 inline-flex items-center gap-2 rounded-full border bg-white px-4 py-2 text-sm font-bold shadow-sm" style={{ borderColor: mainTheme, color: mainTheme }}>
               <Sparkles size={17} />
               {settings.hero_badge}
             </div>
@@ -52,7 +59,7 @@ export default async function Home() {
             <div className="mt-9 flex flex-wrap gap-4">
               <a
                 href="#catalog"
-                className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-yellow-400 to-amber-500 px-7 py-4 font-black text-slate-950 shadow-xl shadow-yellow-500/25 hover:scale-[1.02]"
+                className="inline-flex items-center gap-2 rounded-full px-7 py-4 font-black text-white shadow-xl hover:scale-[1.02]" style={{ backgroundColor: mainTheme }}
               >
                 View Products <ArrowRight size={18} />
               </a>
@@ -74,18 +81,16 @@ export default async function Home() {
       <section id="about" className="mx-auto max-w-7xl px-5 py-20">
         <div className="grid items-center gap-10 md:grid-cols-[1.05fr_0.95fr]">
           <div>
-            <p className="font-black uppercase tracking-[0.25em] text-amber-700">{settings.about_eyebrow}</p>
+            <p className="font-black uppercase tracking-[0.25em]" style={{ color: mainTheme }}>{settings.about_eyebrow}</p>
             <h2 className="mt-4 text-4xl font-black leading-tight md:text-5xl">
               {settings.about_title}
             </h2>
-            <p className="mt-5 text-lg leading-8 text-slate-600">
-              {settings.about_body}
-            </p>
+            <div className="mt-5 text-lg leading-8 text-slate-600" dangerouslySetInnerHTML={{ __html: settings.about_body || "" }} />
 
             <div className="mt-8 grid gap-4 sm:grid-cols-2">
               {(settings.about_benefits || []).map((item) => (
                 <div key={item} className="flex items-start gap-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-yellow-100">
-                  <CheckCircle2 className="mt-1 shrink-0 text-amber-600" />
+                  <CheckCircle2 className="mt-1 shrink-0" style={{ color: mainTheme }} />
                   <p className="font-bold text-slate-700">{item}</p>
                 </div>
               ))}
@@ -99,9 +104,9 @@ export default async function Home() {
               [Truck, settings.feature3_title, settings.feature3_text],
             ].map(([Icon, title, desc]) => (
               <div key={title} className="rounded-3xl bg-slate-950 p-7 text-white shadow-xl shadow-slate-900/10">
-                <Icon className="mb-4 text-yellow-400" size={36} />
+                <Icon className="mb-4" size={36} style={{ color: mainTheme }} />
                 <h3 className="text-2xl font-black">{title}</h3>
-                <p className="mt-2 text-slate-300">{desc}</p>
+                <div className="mt-2 text-slate-300" dangerouslySetInnerHTML={{ __html: desc || "" }} />
               </div>
             ))}
           </div>
@@ -111,7 +116,7 @@ export default async function Home() {
       <section id="catalog" className="bg-slate-950 py-20 text-white">
         <div className="mx-auto max-w-7xl px-5">
           <div className="mx-auto mb-14 max-w-3xl text-center">
-            <p className="font-black uppercase tracking-[0.25em] text-yellow-400">{settings.catalog_eyebrow}</p>
+            <p className="font-black uppercase tracking-[0.25em]" style={{ color: mainTheme }}>{settings.catalog_eyebrow}</p>
             <h2 className="mt-4 text-4xl font-black md:text-5xl">{settings.catalog_title}</h2>
             <p className="mt-4 text-slate-300">{settings.catalog_subtitle}</p>
           </div>
@@ -120,7 +125,7 @@ export default async function Home() {
             {products.map((product) => (
               <article key={product.id} className="group overflow-hidden rounded-[1.7rem] bg-white text-slate-950 shadow-2xl shadow-black/20">
                 <div className="relative grid h-[360px] place-items-center overflow-hidden bg-gradient-to-br from-yellow-50 via-white to-amber-50 p-5 sm:h-[390px]">
-                  <div className="absolute left-4 top-4 z-10 rounded-full bg-yellow-400 px-4 py-2 text-xs font-black uppercase text-slate-950 shadow-md">
+                  <div className="absolute left-4 top-4 z-10 rounded-full px-4 py-2 text-xs font-black uppercase text-white shadow-md" style={{ backgroundColor: mainTheme }}>
                     {product.category}
                   </div>
                   <img
@@ -131,14 +136,14 @@ export default async function Home() {
                 </div>
                 <div className="p-6">
                   <h3 className="text-2xl font-black">{product.name}</h3>
-                  <p className="mt-3 min-h-[72px] text-slate-600">{product.description}</p>
-                  {product.mrp && <p className="mt-3 text-lg font-black text-amber-700">MRP: Rs. {product.mrp}</p>}
+                  <div className="mt-3 min-h-[72px] text-slate-600" dangerouslySetInnerHTML={{ __html: product.description || "" }} />
+                  {product.mrp && <p className="mt-3 text-lg font-black" style={{ color: mainTheme }}>MRP: Rs. {product.mrp}</p>}
                   <div className="mt-5 flex flex-wrap gap-2">
                     {(product.features || []).map((feature) => (
                       <span key={feature} className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-700">{feature}</span>
                     ))}
                   </div>
-                  <a href={`/products/${product.slug}`} className="mt-6 inline-flex items-center gap-2 rounded-full bg-slate-950 px-5 py-3 text-sm font-black text-white hover:bg-amber-600">
+                  <a href={`/products/${product.slug}`} className="mt-6 inline-flex items-center gap-2 rounded-full px-5 py-3 text-sm font-black text-white" style={{ backgroundColor: mainTheme }}>
                     View Details <ArrowRight size={16} />
                   </a>
                 </div>
@@ -153,7 +158,7 @@ export default async function Home() {
         <div className="relative mx-auto max-w-5xl">
           <div className="rounded-[2rem] bg-white p-6 shadow-2xl shadow-amber-900/10 ring-1 ring-yellow-100 md:p-12">
             <div className="mb-10 text-center">
-              <p className="font-black uppercase tracking-[0.25em] text-amber-700">{settings.contact_eyebrow}</p>
+              <p className="font-black uppercase tracking-[0.25em]" style={{ color: mainTheme }}>{settings.contact_eyebrow}</p>
               <h2 className="mt-3 text-4xl font-black md:text-5xl">{settings.contact_title}</h2>
               <p className="mt-4 text-slate-600">{settings.contact_subtitle}</p>
             </div>

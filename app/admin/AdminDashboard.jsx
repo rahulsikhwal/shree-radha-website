@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
-import { Check, Edit3, Eye, EyeOff, LogOut, Plus, Save, Trash2, RefreshCw, Mail, Phone, Building2, MessageSquare, Image as ImageIcon, UploadCloud } from "lucide-react";
+import { Check, Edit3, Eye, EyeOff, LogOut, Plus, Save, Trash2, RefreshCw, Mail, Phone, Building2, MessageSquare, Image as ImageIcon, UploadCloud, Download, Palette } from "lucide-react";
 
 const emptyProduct = {
   slug: "",
@@ -15,6 +15,8 @@ const emptyProduct = {
   mrp: "",
   is_active: true,
   sort_order: 99,
+  gallery_images: [],
+  detail_sections: [],
 };
 
 const emptyStat = { value: "", label: "", sort_order: 99, is_active: true };
@@ -41,37 +43,86 @@ const SUPPORTED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_PRODUCT_IMAGE_SIZE = 2 * 1024 * 1024;
 const PRODUCT_IMAGE_HELP = "Recommended image: 1200 x 1200 px square, under 2 MB. Supported formats: JPG, PNG, WEBP.";
 
-function RichTextEditor({ label, value, onChange }) {
+const DEFAULT_THEME = "#f59e0b";
+
+function stripHtml(value = "") {
+  return String(value).replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function toFeatureItems(value) {
+  if (Array.isArray(value)) return value;
+  return String(value || "")
+    .split(/<br\s*\/?|<\/div>|<\/p>|\n|,/i)
+    .map((item) => stripHtml(item))
+    .filter(Boolean);
+}
+
+function escapeCsv(value) {
+  const text = String(value ?? "").replace(/\r?\n/g, " ");
+  return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+function normalizeHexColor(value, fallback = DEFAULT_THEME) {
+  return /^#[0-9A-F]{6}$/i.test(value || "") ? value : fallback;
+}
+
+function AdminRichText({ label, value, onChange, minHeight = 160, showPreview = true }) {
+  const editorRef = useRef(null);
+
+  useEffect(() => {
+    if (editorRef.current && editorRef.current.innerHTML !== (value || "")) {
+      editorRef.current.innerHTML = value || "";
+    }
+  }, [value]);
+
   const format = (command, valueArg = null) => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    editor.focus();
     document.execCommand(command, false, valueArg);
+    onChange(editor.innerHTML);
   };
+
+  const buttonClass = "rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-black text-slate-800 shadow-sm hover:bg-amber-50 hover:text-amber-700 active:scale-[0.98]";
 
   return (
     <div className="mt-4 block">
       <span className="mb-2 block text-xs font-black uppercase tracking-wide text-slate-400">{label}</span>
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
         <div className="flex flex-wrap gap-2 border-b border-slate-200 bg-slate-50 p-3">
-          <button type="button" onClick={() => format('bold')} className="rounded bg-white px-3 py-1 text-sm font-bold">Bold</button>
-          <button type="button" onClick={() => format('underline')} className="rounded bg-white px-3 py-1 text-sm font-bold">Underline</button>
-          <button type="button" onClick={() => format('insertUnorderedList')} className="rounded bg-white px-3 py-1 text-sm font-bold">List</button>
-          <select onChange={(e) => format('fontSize', e.target.value)} className="rounded border px-2 py-1 text-sm">
+          <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => format("bold")} className={buttonClass}>Bold</button>
+          <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => format("underline")} className={buttonClass}>Underline</button>
+          <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => format("insertUnorderedList")} className={buttonClass}>List</button>
+          <select
+            onMouseDown={(e) => e.stopPropagation()}
+            onChange={(e) => format("fontSize", e.target.value)}
+            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-bold outline-none focus:border-amber-400"
+            defaultValue="3"
+          >
             <option value="3">Normal</option>
             <option value="4">Large</option>
             <option value="5">Heading</option>
           </select>
         </div>
         <div
+          ref={editorRef}
           contentEditable
           suppressContentEditableWarning
-          className="min-h-[160px] p-4 outline-none"
-          dangerouslySetInnerHTML={{ __html: value || '' }}
+          className="prose max-w-none p-4 outline-none focus:bg-amber-50/20"
+          style={{ minHeight }}
           onInput={(e) => onChange(e.currentTarget.innerHTML)}
+          onBlur={(e) => onChange(e.currentTarget.innerHTML)}
         />
       </div>
+      {showPreview && (
+        <div className="mt-3 rounded-xl border border-dashed border-amber-200 bg-amber-50/30 p-4">
+          <p className="mb-2 text-xs font-black uppercase tracking-wide text-amber-700">Live Preview</p>
+          <div className="prose max-w-none text-sm text-slate-700" dangerouslySetInnerHTML={{ __html: value || "<p class='text-slate-400'>Nothing to preview yet.</p>" }} />
+        </div>
+      )}
     </div>
   );
 }
-
 
 export default function AdminDashboard() {
   const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL || "";
@@ -81,6 +132,7 @@ export default function AdminDashboard() {
   const [products, setProducts] = useState([]);
   const [stats, setStats] = useState([]);
   const [inquiries, setInquiries] = useState([]);
+  const [selectedInquiryIds, setSelectedInquiryIds] = useState([]);
   const [editingProduct, setEditingProduct] = useState(null);
   const [originalProductImageUrl, setOriginalProductImageUrl] = useState("");
   const [editingStat, setEditingStat] = useState(null);
@@ -119,6 +171,7 @@ export default function AdminDashboard() {
     if (p.data) setProducts(p.data);
     if (st.data) setStats(st.data);
     if (inq.data) setInquiries(inq.data);
+    setSelectedInquiryIds([]);
     setLoading(false);
   }
 
@@ -291,6 +344,54 @@ export default function AdminDashboard() {
     });
   }
 
+
+  function exportInquiriesToExcel() {
+    if (!inquiries.length) {
+      showMsg("No enquiries available to export.", "error");
+      return;
+    }
+
+    const rows = inquiries.map((item) => ({
+      Date: item.created_at ? new Date(item.created_at).toLocaleString("en-IN") : "",
+      Name: item.name || "",
+      Company: item.company || "",
+      Email: item.email || "",
+      Phone: item.phone || "",
+      Interest: item.interest || "",
+      Message: item.message || "",
+    }));
+    const headers = Object.keys(rows[0]);
+    const csv = [headers.join(","), ...rows.map((row) => headers.map((header) => escapeCsv(row[header])).join(","))].join("\n");
+    const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `enquiries-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function toggleInquirySelection(id) {
+    setSelectedInquiryIds((prev) => prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]);
+  }
+
+  function toggleAllInquiries(checked) {
+    setSelectedInquiryIds(checked ? inquiries.map((item) => item.id) : []);
+  }
+
+  async function deleteSelectedInquiries() {
+    if (!selectedInquiryIds.length) {
+      showMsg("Select enquiries first.", "error");
+      return;
+    }
+    if (!window.confirm(`Delete ${selectedInquiryIds.length} selected enquiry/enquiries permanently?`)) return;
+    const { error } = await supabase.from("inquiries").delete().in("id", selectedInquiryIds);
+    showMsg(error ? error.message : "Selected enquiries deleted.", error ? "error" : "success");
+    if (!error) loadAdminData();
+  }
+
   async function signIn(e) {
     e.preventDefault();
     setMessage({ text: "", type: "success" });
@@ -304,6 +405,7 @@ export default function AdminDashboard() {
       ...settings,
       id: 1,
       about_benefits: Array.isArray(settings.about_benefits) ? settings.about_benefits : fromLines(settings.about_benefits || ""),
+      theme_color: normalizeHexColor(settings.theme_color || DEFAULT_THEME),
       updated_at: new Date().toISOString(),
     };
     const { error } = await supabase.from("site_settings").upsert(payload);
@@ -316,7 +418,7 @@ export default function AdminDashboard() {
     const product = {
       ...editingProduct,
       slug: editingProduct.slug || slugify(editingProduct.name),
-      features: Array.isArray(editingProduct.features) ? editingProduct.features : fromFeatureText(editingProduct.features),
+      features: toFeatureItems(editingProduct.features),
       updated_at: new Date().toISOString(),
     };
     const { error } = product.id
@@ -447,6 +549,35 @@ export default function AdminDashboard() {
       {activeTab === "Settings" && settings && (
         <form onSubmit={saveSettings} className="rounded-3xl bg-white p-6 shadow-xl ring-1 ring-yellow-100 max-w-2xl">
           <h2 className="mb-6 text-xl font-black">Company Settings</h2>
+          <section className="mb-6 rounded-2xl border border-amber-100 bg-amber-50/40 p-4">
+            <div className="mb-3 flex items-center gap-2">
+              <Palette size={18} className="text-amber-700" />
+              <h3 className="font-black text-slate-800">Theme Color</h3>
+            </div>
+            <p className="mb-4 text-sm text-slate-600">Choose the main website color. It applies to frontend highlights and admin buttons without changing the overall layout.</p>
+            <div className="flex flex-wrap items-center gap-3">
+              <input
+                type="color"
+                value={normalizeHexColor(settings.theme_color || DEFAULT_THEME)}
+                onChange={(e) => setSettings({ ...settings, theme_color: e.target.value })}
+                className="h-12 w-16 cursor-pointer rounded-xl border border-slate-200 bg-white p-1"
+                aria-label="Theme color"
+              />
+              <input
+                value={normalizeHexColor(settings.theme_color || DEFAULT_THEME)}
+                onChange={(e) => setSettings({ ...settings, theme_color: e.target.value })}
+                className="w-32 rounded-xl border border-slate-200 bg-white p-3 text-sm font-bold outline-none focus:border-amber-400"
+              />
+              <button
+                type="button"
+                onClick={() => setSettings({ ...settings, theme_color: DEFAULT_THEME })}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 hover:bg-slate-50"
+              >
+                Default Theme
+              </button>
+              <span className="rounded-full px-4 py-2 text-sm font-black text-white" style={{ backgroundColor: normalizeHexColor(settings.theme_color || DEFAULT_THEME) }}>Preview</span>
+            </div>
+          </section>
           <div className="grid gap-4 sm:grid-cols-2">
             {[
               { key: "company_name", label: "Company Name" },
@@ -512,10 +643,7 @@ export default function AdminDashboard() {
                   <input value={settings.about_title || ""} onChange={(e) => setSettings({ ...settings, about_title: e.target.value })} className="w-full rounded-xl border border-slate-200 bg-white p-3 text-sm outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100" />
                 </label>
               </div>
-              <label className="mt-4 block">
-                <span className="mb-1 block text-xs font-black uppercase tracking-wide text-slate-400">About Paragraph</span>
-                <textarea value={settings.about_body || ""} onChange={(e) => setSettings({ ...settings, about_body: e.target.value })} rows={3} className="w-full rounded-xl border border-slate-200 bg-white p-3 text-sm outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100" />
-              </label>
+              <AdminRichText label="About Paragraph" value={settings.about_body || ""} onChange={(value) => setSettings({ ...settings, about_body: value })} minHeight={120} />
               <label className="mt-4 block">
                 <span className="mb-1 block text-xs font-black uppercase tracking-wide text-slate-400">Benefit Points - one per line</span>
                 <textarea value={toLines(settings.about_benefits)} onChange={(e) => setSettings({ ...settings, about_benefits: fromLines(e.target.value) })} rows={5} className="w-full rounded-xl border border-slate-200 bg-white p-3 text-sm outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100" />
@@ -531,10 +659,7 @@ export default function AdminDashboard() {
                       <span className="mb-1 block text-xs font-black uppercase tracking-wide text-slate-400">Card {n} Title</span>
                       <input value={settings[`feature${n}_title`] || ""} onChange={(e) => setSettings({ ...settings, [`feature${n}_title`]: e.target.value })} className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm outline-none focus:border-amber-400" />
                     </label>
-                    <label className="mt-3 block">
-                      <span className="mb-1 block text-xs font-black uppercase tracking-wide text-slate-400">Card {n} Text</span>
-                      <textarea value={settings[`feature${n}_text`] || ""} onChange={(e) => setSettings({ ...settings, [`feature${n}_text`]: e.target.value })} rows={3} className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm outline-none focus:border-amber-400" />
-                    </label>
+                    <AdminRichText label={`Card ${n} Text`} value={settings[`feature${n}_text`] || ""} onChange={(value) => setSettings({ ...settings, [`feature${n}_text`]: value })} minHeight={100} showPreview={false} />
                   </div>
                 ))}
               </div>
@@ -660,22 +785,22 @@ export default function AdminDashboard() {
                   </label>
                 </div>
               </div>
-              <RichTextEditor
+              <AdminRichText
                 label="Short Description"
                 value={editingProduct.description || ""}
                 onChange={(value) => setEditingProduct({ ...editingProduct, description: value })}
               />
 
-              <RichTextEditor
+              <AdminRichText
                 label="Product Detail Page Content"
                 value={editingProduct.detail || ""}
                 onChange={(value) => setEditingProduct({ ...editingProduct, detail: value })}
               />
 
-              <RichTextEditor
+              <AdminRichText
                 label="Features"
                 value={Array.isArray(editingProduct.features) ? editingProduct.features.join("<br>") : editingProduct.features || ""}
-                onChange={(value) => setEditingProduct({ ...editingProduct, features: value.split(/<br>|<div>|<\/div>|\n/).map(v => v.replace(/<[^>]*>/g, '').trim()).filter(Boolean) })}
+                onChange={(value) => setEditingProduct({ ...editingProduct, features: toFeatureItems(value) })}
               />
 
               <div className="mt-4 rounded-3xl border border-slate-200 bg-slate-50 p-4">
@@ -827,9 +952,20 @@ export default function AdminDashboard() {
       {/* ── ENQUIRIES TAB ── */}
       {activeTab === "Enquiries" && (
         <div className="rounded-3xl bg-white p-6 shadow-xl ring-1 ring-yellow-100">
-          <div className="mb-6 flex items-center justify-between">
-            <h2 className="text-xl font-black">Latest Enquiries</h2>
-            <span className="rounded-full bg-amber-100 px-3 py-1 text-sm font-black text-amber-800">{inquiries.length} total</span>
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-xl font-black">Latest Enquiries</h2>
+              <p className="text-sm font-bold text-slate-400">Export all enquiries or select records to delete.</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-full bg-amber-100 px-3 py-1 text-sm font-black text-amber-800">{inquiries.length} total</span>
+              <button type="button" onClick={exportInquiriesToExcel} className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-black text-white hover:bg-amber-600">
+                <Download size={16} /> Export All
+              </button>
+              <button type="button" onClick={deleteSelectedInquiries} disabled={!selectedInquiryIds.length} className="inline-flex items-center gap-2 rounded-xl bg-red-50 px-4 py-2.5 text-sm font-black text-red-600 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50">
+                <Trash2 size={16} /> Delete Selected
+              </button>
+            </div>
           </div>
           {inquiries.length === 0 ? (
             <div className="py-16 text-center">
@@ -838,9 +974,18 @@ export default function AdminDashboard() {
               <p className="mt-1 text-sm text-slate-300">Submissions from the contact form will appear here.</p>
             </div>
           ) : (
-            <div className="grid gap-4">
+            <>
+              <label className="mb-4 inline-flex cursor-pointer items-center gap-2 rounded-xl bg-slate-50 px-4 py-3 text-sm font-black text-slate-700 ring-1 ring-slate-100">
+                <input type="checkbox" checked={selectedInquiryIds.length === inquiries.length && inquiries.length > 0} onChange={(e) => toggleAllInquiries(e.target.checked)} className="h-4 w-4 rounded" />
+                Select all enquiries
+              </label>
+              <div className="grid gap-4">
               {inquiries.map((item) => (
-                <div key={item.id} className="rounded-2xl border border-slate-100 bg-slate-50/50 p-5">
+                <div key={item.id} className={`rounded-2xl border p-5 ${selectedInquiryIds.includes(item.id) ? "border-amber-300 bg-amber-50/50" : "border-slate-100 bg-slate-50/50"}`}>
+                  <div className="mb-3 flex items-center gap-2">
+                    <input type="checkbox" checked={selectedInquiryIds.includes(item.id)} onChange={() => toggleInquirySelection(item.id)} className="h-4 w-4 rounded" />
+                    <span className="text-xs font-black uppercase tracking-wide text-slate-400">Select enquiry</span>
+                  </div>
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <h3 className="font-black text-slate-950">{item.name}</h3>
@@ -858,7 +1003,8 @@ export default function AdminDashboard() {
                   <p className="mt-3 rounded-xl bg-white p-3 text-sm text-slate-700 ring-1 ring-slate-100">{item.message}</p>
                 </div>
               ))}
-            </div>
+              </div>
+            </>
           )}
         </div>
       )}
