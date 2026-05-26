@@ -41,6 +41,38 @@ const SUPPORTED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_PRODUCT_IMAGE_SIZE = 2 * 1024 * 1024;
 const PRODUCT_IMAGE_HELP = "Recommended image: 1200 x 1200 px square, under 2 MB. Supported formats: JPG, PNG, WEBP.";
 
+function RichTextEditor({ label, value, onChange }) {
+  const format = (command, valueArg = null) => {
+    document.execCommand(command, false, valueArg);
+  };
+
+  return (
+    <div className="mt-4 block">
+      <span className="mb-2 block text-xs font-black uppercase tracking-wide text-slate-400">{label}</span>
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+        <div className="flex flex-wrap gap-2 border-b border-slate-200 bg-slate-50 p-3">
+          <button type="button" onClick={() => format('bold')} className="rounded bg-white px-3 py-1 text-sm font-bold">Bold</button>
+          <button type="button" onClick={() => format('underline')} className="rounded bg-white px-3 py-1 text-sm font-bold">Underline</button>
+          <button type="button" onClick={() => format('insertUnorderedList')} className="rounded bg-white px-3 py-1 text-sm font-bold">List</button>
+          <select onChange={(e) => format('fontSize', e.target.value)} className="rounded border px-2 py-1 text-sm">
+            <option value="3">Normal</option>
+            <option value="4">Large</option>
+            <option value="5">Heading</option>
+          </select>
+        </div>
+        <div
+          contentEditable
+          suppressContentEditableWarning
+          className="min-h-[160px] p-4 outline-none"
+          dangerouslySetInnerHTML={{ __html: value || '' }}
+          onInput={(e) => onChange(e.currentTarget.innerHTML)}
+        />
+      </div>
+    </div>
+  );
+}
+
+
 export default function AdminDashboard() {
   const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL || "";
   const [session, setSession] = useState(null);
@@ -578,17 +610,51 @@ export default function AdminDashboard() {
                   </label>
                 </div>
               </div>
+              <RichTextEditor
+                label="Short Description"
+                value={editingProduct.description || ""}
+                onChange={(value) => setEditingProduct({ ...editingProduct, description: value })}
+              />
+
+              <RichTextEditor
+                label="Product Detail Page Content"
+                value={editingProduct.detail || ""}
+                onChange={(value) => setEditingProduct({ ...editingProduct, detail: value })}
+              />
+
+              <RichTextEditor
+                label="Features"
+                value={Array.isArray(editingProduct.features) ? editingProduct.features.join("<br>") : editingProduct.features || ""}
+                onChange={(value) => setEditingProduct({ ...editingProduct, features: value.split(/<br>|<div>|<\/div>|
+/).map(v => v.replace(/<[^>]*>/g, '').trim()).filter(Boolean) })}
+              />
+
               <label className="mt-4 block">
-                <span className="mb-1 block text-xs font-black uppercase tracking-wide text-slate-400">Short Description</span>
-                <textarea required value={editingProduct.description || ""} onChange={(e) => setEditingProduct({ ...editingProduct, description: e.target.value })} rows={2} className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100" />
+                <span className="mb-1 block text-xs font-black uppercase tracking-wide text-slate-400">Multiple Product Images (comma separated URLs)</span>
+                <textarea
+                  value={(editingProduct.gallery_images || []).join(', ')}
+                  onChange={(e) => setEditingProduct({
+                    ...editingProduct,
+                    gallery_images: e.target.value.split(',').map(v => v.trim()).filter(Boolean)
+                  })}
+                  rows={3}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
+                  placeholder="/img1.jpg, /img2.jpg"
+                />
               </label>
+
               <label className="mt-4 block">
-                <span className="mb-1 block text-xs font-black uppercase tracking-wide text-slate-400">Product Detail Page Content</span>
-                <textarea value={editingProduct.detail || ""} onChange={(e) => setEditingProduct({ ...editingProduct, detail: e.target.value })} rows={4} className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100" />
-              </label>
-              <label className="mt-4 block">
-                <span className="mb-1 block text-xs font-black uppercase tracking-wide text-slate-400">Features comma separated</span>
-                <input value={toFeatureText(editingProduct.features)} onChange={(e) => setEditingProduct({ ...editingProduct, features: fromFeatureText(e.target.value) })} placeholder="Ultra Light, Soft Cushion, Anti-Slip" className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100" />
+                <span className="mb-1 block text-xs font-black uppercase tracking-wide text-slate-400">Multiple Sections JSON</span>
+                <textarea
+                  value={JSON.stringify(editingProduct.detail_sections || [], null, 2)}
+                  onChange={(e) => {
+                    try {
+                      setEditingProduct({ ...editingProduct, detail_sections: JSON.parse(e.target.value) });
+                    } catch {}
+                  }}
+                  rows={8}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
+                />
               </label>
               <div className="mt-4 flex items-center gap-6">
                 <label className="block">

@@ -56,7 +56,7 @@ export default async function ProductDetailPage({ params }) {
             </h1>
 
             <p className="mt-5 text-xl leading-8 text-slate-600">
-              {product.description}
+              <div dangerouslySetInnerHTML={{ __html: product.description || "" }} />
             </p>
 
             {product.mrp && (
@@ -90,7 +90,7 @@ export default async function ProductDetailPage({ params }) {
         <div className="mx-auto mt-12 max-w-7xl rounded-[2rem] bg-white p-8 shadow-xl ring-1 ring-yellow-100">
           <h2 className="text-3xl font-black">Product Details</h2>
           <p className="mt-5 text-lg leading-8 text-slate-600">
-            {product.detail}
+            <div dangerouslySetInnerHTML={{ __html: product.detail || "" }} />
           </p>
         </div>
       </section>
@@ -99,3 +99,24 @@ export default async function ProductDetailPage({ params }) {
     </main>
   );
 }
+
+
+      {product.gallery_images?.length > 0 && (
+        <div className="mt-10 grid grid-cols-2 gap-4 md:grid-cols-3">
+          {product.gallery_images.map((img, idx) => (
+            <img key={idx} src={img} alt="gallery" className="rounded-2xl w-full h-52 object-cover" />
+          ))}
+        </div>
+      )}
+
+      {product.detail_sections?.map((section, idx) => (
+        <section key={idx} className="mt-10 rounded-3xl bg-white p-6 shadow">
+          <h2 className="mb-4 text-2xl font-bold">{section.title}</h2>
+          <div dangerouslySetInnerHTML={{ __html: section.content || '' }} />
+          <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-3">
+            {section.images?.map((img, i) => (
+              <img key={i} src={img} alt={section.title} className="rounded-2xl h-48 w-full object-cover" />
+            ))}
+          </div>
+        </section>
+      ))}
