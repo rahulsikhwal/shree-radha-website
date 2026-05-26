@@ -625,8 +625,7 @@ export default function AdminDashboard() {
               <RichTextEditor
                 label="Features"
                 value={Array.isArray(editingProduct.features) ? editingProduct.features.join("<br>") : editingProduct.features || ""}
-                onChange={(value) => setEditingProduct({ ...editingProduct, features: value.split(/<br>|<div>|<\/div>|
-/).map(v => v.replace(/<[^>]*>/g, '').trim()).filter(Boolean) })}
+                onChange={(value) => setEditingProduct({ ...editingProduct, features: value.split(/<br>|<div>|<\/div>|\n/).map(v => v.replace(/<[^>]*>/g, '').trim()).filter(Boolean) })}
               />
 
               <label className="mt-4 block">

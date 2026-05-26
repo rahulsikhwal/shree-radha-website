@@ -55,9 +55,7 @@ export default async function ProductDetailPage({ params }) {
               {product.name}
             </h1>
 
-            <p className="mt-5 text-xl leading-8 text-slate-600">
-              <div dangerouslySetInnerHTML={{ __html: product.description || "" }} />
-            </p>
+            <div className="mt-5 text-xl leading-8 text-slate-600" dangerouslySetInnerHTML={{ __html: product.description || "" }} />
 
             {product.mrp && (
               <div className="mt-6 inline-flex w-fit rounded-2xl bg-yellow-400 px-5 py-3 text-xl font-black text-slate-950">
@@ -89,34 +87,36 @@ export default async function ProductDetailPage({ params }) {
 
         <div className="mx-auto mt-12 max-w-7xl rounded-[2rem] bg-white p-8 shadow-xl ring-1 ring-yellow-100">
           <h2 className="text-3xl font-black">Product Details</h2>
-          <p className="mt-5 text-lg leading-8 text-slate-600">
-            <div dangerouslySetInnerHTML={{ __html: product.detail || "" }} />
-          </p>
+          <div className="mt-5 text-lg leading-8 text-slate-600" dangerouslySetInnerHTML={{ __html: product.detail || "" }} />
         </div>
+
+        {product.gallery_images?.length > 0 && (
+          <div className="mx-auto mt-12 max-w-7xl rounded-[2rem] bg-white p-8 shadow-xl ring-1 ring-yellow-100">
+            <h2 className="text-3xl font-black">Product Gallery</h2>
+            <div className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-3">
+              {product.gallery_images.map((img, idx) => (
+                <img key={idx} src={img} alt={`${product.name} gallery ${idx + 1}`} className="h-52 w-full rounded-2xl object-cover" />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {product.detail_sections?.map((section, idx) => (
+          <section key={idx} className="mx-auto mt-12 max-w-7xl rounded-[2rem] bg-white p-8 shadow-xl ring-1 ring-yellow-100">
+            <h2 className="text-3xl font-black">{section.title}</h2>
+            <div className="mt-5 text-lg leading-8 text-slate-600" dangerouslySetInnerHTML={{ __html: section.content || '' }} />
+            {section.images?.length > 0 && (
+              <div className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-3">
+                {section.images.map((img, i) => (
+                  <img key={i} src={img} alt={`${section.title} ${i + 1}`} className="h-48 w-full rounded-2xl object-cover" />
+                ))}
+              </div>
+            )}
+          </section>
+        ))}
       </section>
 
       <Footer settings={settings} />
     </main>
   );
 }
-
-
-      {product.gallery_images?.length > 0 && (
-        <div className="mt-10 grid grid-cols-2 gap-4 md:grid-cols-3">
-          {product.gallery_images.map((img, idx) => (
-            <img key={idx} src={img} alt="gallery" className="rounded-2xl w-full h-52 object-cover" />
-          ))}
-        </div>
-      )}
-
-      {product.detail_sections?.map((section, idx) => (
-        <section key={idx} className="mt-10 rounded-3xl bg-white p-6 shadow">
-          <h2 className="mb-4 text-2xl font-bold">{section.title}</h2>
-          <div dangerouslySetInnerHTML={{ __html: section.content || '' }} />
-          <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-3">
-            {section.images?.map((img, i) => (
-              <img key={i} src={img} alt={section.title} className="rounded-2xl h-48 w-full object-cover" />
-            ))}
-          </div>
-        </section>
-      ))}
