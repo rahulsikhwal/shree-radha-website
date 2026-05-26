@@ -32,3 +32,10 @@ Required environment variables if using Supabase:
 
 - NEXT_PUBLIC_SUPABASE_URL
 - NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+## Latest admin image upload update
+- Product edit section now shows the currently selected/existing image preview.
+- Admin can select a new image using the Choose Image dialog box.
+- Recommended product image: 1200 x 1200 px square, under 2 MB.
+- Supported formats: JPG, PNG, WEBP.
+- Run `supabase/schema.sql` once in Supabase SQL Editor to create/update the `product-images` public storage bucket and policies.

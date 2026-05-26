@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
-import { Check, Edit3, Eye, EyeOff, LogOut, Plus, Save, Trash2, RefreshCw, Mail, Phone, Building2, MessageSquare } from "lucide-react";
+import { Check, Edit3, Eye, EyeOff, LogOut, Plus, Save, Trash2, RefreshCw, Mail, Phone, Building2, MessageSquare, Image as ImageIcon, UploadCloud } from "lucide-react";
 
 const emptyProduct = {
   slug: "",
@@ -36,6 +36,10 @@ function fromLines(value) {
 }
 
 const TABS = ["Settings", "Content", "Products", "Stats", "Enquiries"];
+const PRODUCT_IMAGE_BUCKET = "product-images";
+const SUPPORTED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const MAX_PRODUCT_IMAGE_SIZE = 2 * 1024 * 1024;
+const PRODUCT_IMAGE_HELP = "Recommended image: 1200 x 1200 px square, under 2 MB. Supported formats: JPG, PNG, WEBP.";
 
 export default function AdminDashboard() {
   const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL || "";
@@ -88,6 +92,45 @@ export default function AdminDashboard() {
   function showMsg(text, type = "success") {
     setMessage({ text, type });
     setTimeout(() => setMessage({ text: "", type: "success" }), 3500);
+  }
+
+
+  function getPublicAssetPath(value) {
+    if (!value) return "";
+    return value.startsWith("http") || value.startsWith("/") ? value : `/${value}`;
+  }
+
+  async function uploadProductImage(file) {
+    if (!file || !editingProduct) return;
+    if (!SUPPORTED_IMAGE_TYPES.includes(file.type)) {
+      showMsg("Please upload only JPG, PNG or WEBP images.", "error");
+      return;
+    }
+    if (file.size > MAX_PRODUCT_IMAGE_SIZE) {
+      showMsg("Image is too large. Please upload an image under 2 MB.", "error");
+      return;
+    }
+
+    const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
+    const safeSlug = editingProduct.slug || slugify(editingProduct.name || "product");
+    const filePath = `${safeSlug}-${Date.now()}.${extension}`;
+
+    const { error } = await supabase.storage
+      .from(PRODUCT_IMAGE_BUCKET)
+      .upload(filePath, file, {
+        cacheControl: "3600",
+        upsert: false,
+        contentType: file.type,
+      });
+
+    if (error) {
+      showMsg(`Image upload failed: ${error.message}. Please confirm the product-images bucket exists in Supabase.`, "error");
+      return;
+    }
+
+    const { data } = supabase.storage.from(PRODUCT_IMAGE_BUCKET).getPublicUrl(filePath);
+    setEditingProduct({ ...editingProduct, image_url: data.publicUrl });
+    showMsg("Image uploaded and selected. Save the product to keep this image.");
   }
 
   async function signIn(e) {
@@ -410,10 +453,46 @@ export default function AdminDashboard() {
                   <input value={editingProduct.mrp || ""} onChange={(e) => setEditingProduct({ ...editingProduct, mrp: e.target.value })} placeholder="Leave blank to hide MRP" className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100" />
                 </label>
               </div>
-              <label className="mt-4 block">
-                <span className="mb-1 block text-xs font-black uppercase tracking-wide text-slate-400">Image URL</span>
-                <input value={editingProduct.image_url || ""} onChange={(e) => setEditingProduct({ ...editingProduct, image_url: e.target.value })} placeholder="/product-flynfit.jpg or https://..." className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100" />
-              </label>
+              <div className="mt-5 rounded-3xl border border-amber-100 bg-amber-50/40 p-4">
+                <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <span className="block text-xs font-black uppercase tracking-wide text-slate-400">Product Image</span>
+                    <p className="mt-1 text-sm font-semibold text-slate-600">Existing selected image is shown below. Upload a new image only if you want to change it.</p>
+                    <p className="mt-1 text-xs font-bold text-amber-700">{PRODUCT_IMAGE_HELP}</p>
+                  </div>
+                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white hover:bg-amber-600 transition-colors">
+                    <UploadCloud size={17} /> Choose Image
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="hidden"
+                      onChange={(e) => uploadProductImage(e.target.files?.[0])}
+                    />
+                  </label>
+                </div>
+
+                <div className="grid gap-4 lg:grid-cols-[220px_1fr]">
+                  <div className="flex min-h-[180px] items-center justify-center rounded-2xl border border-dashed border-amber-200 bg-white p-3">
+                    {editingProduct.image_url ? (
+                      <img
+                        src={getPublicAssetPath(editingProduct.image_url)}
+                        alt={editingProduct.name || "Selected product"}
+                        className="max-h-44 w-full object-contain"
+                      />
+                    ) : (
+                      <div className="text-center text-slate-400">
+                        <ImageIcon className="mx-auto mb-2" size={34} />
+                        <p className="text-sm font-bold">No image selected</p>
+                      </div>
+                    )}
+                  </div>
+                  <label className="block">
+                    <span className="mb-1 block text-xs font-black uppercase tracking-wide text-slate-400">Selected Image URL</span>
+                    <input value={editingProduct.image_url || ""} onChange={(e) => setEditingProduct({ ...editingProduct, image_url: e.target.value })} placeholder="Upload from dialog box or paste /product-flynfit.jpg or https://..." className="w-full rounded-xl border border-slate-200 bg-white p-3 text-sm outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100" />
+                    <p className="mt-2 text-xs text-slate-500">Use the button to select an image from your computer. You may also paste an existing public image path/URL manually.</p>
+                  </label>
+                </div>
+              </div>
               <label className="mt-4 block">
                 <span className="mb-1 block text-xs font-black uppercase tracking-wide text-slate-400">Short Description</span>
                 <textarea required value={editingProduct.description || ""} onChange={(e) => setEditingProduct({ ...editingProduct, description: e.target.value })} rows={2} className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100" />
